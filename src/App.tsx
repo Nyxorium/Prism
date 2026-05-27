@@ -103,14 +103,14 @@ export default function App() {
       <header className="header">
         <div className="header-inner">
           <span className="logo">🏳️‍🌈 PrideLabeller</span>
-          <span className="tagline">Add pride labels to your Bluesky profile</span>
+          <span className="tagline">Add pride labels to your profile using <a href="https://bsky.app/profile/pridelabeller.bsky.social" target="_blank" rel="noreferrer">pridelabeller.bsky.social</a></span>
         </div>
       </header>
 
       <main className="main">
         {step === "login" && (
           <div className="card">
-            <h1 className="card-title">Sign in to Bluesky</h1>
+            <h1 className="card-title">Sign into the Atmosphere</h1>
             <p className="card-subtitle">
               Use an{" "}
               <a href="https://bsky.app/settings/app-passwords" target="_blank" rel="noreferrer">
