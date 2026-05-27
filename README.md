@@ -1,12 +1,12 @@
 # Prism
 
-A self-serve web UI for applying pride labels to your Bluesky profile, powered by AT Protocol labellers.
+A self-serve web UI for applying pride labels to your Atmosphere/Bluesky profile.
 
 Built by [Nyxorium](https://github.com/Nyxorium).
 
 ## How it works
 
-Users sign in with a Bluesky app password, pick their pride labels from a curated list, and Prism applies them via an Ozone labeller — no firehose, no persistent process, just a serverless function that fires on demand.
+Users sign in with an app password, pick their pride labels from a curated list, and Prism applies them via an Ozone labeller — no firehose, no persistent process, just a serverless function that fires on demand.
 
 ## Project structure
 
