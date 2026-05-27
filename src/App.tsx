@@ -35,14 +35,14 @@ export default function App() {
         body: JSON.stringify({ handle, appPassword, pdsUrl: pdsUrl || DEFAULT_PDS }),
       });
       const data = await res.json() as Record<string, any>;
-      if (!res.ok) throw new Error(data.error ?? "Failed to sign in");
+      if (!res.ok) throw new Error(data.error ?? "Something went wrong. Please try again.");
       localStorage.setItem('pridelabeller:pdsUrl', pdsUrl || DEFAULT_PDS);
       localStorage.setItem('pridelabeller:handle', handle);
       setSession({ handle, appPassword, pdsUrl: pdsUrl || DEFAULT_PDS, did: data.did, currentLabels: data.labels });
       setSelected(new Set(data.labels));
       setStep("labels");
     } catch (e: any) {
-      setError(e.message ?? "Something went wrong");
+      setError(e.message ?? "Something went wrong. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -74,12 +74,12 @@ export default function App() {
           }),
         });
         const data = await res.json() as Record<string, any>;
-        if (!res.ok) throw new Error(data.error ?? `Failed to ${action} label ${label}`);
+        if (!res.ok) throw new Error(data.error ?? "Something went wrong. Please try again.");
       }
       setSession(s => s ? { ...s, currentLabels: [...selected] } : s);
       setStep("success");
     } catch (e: any) {
-      setError(e.message ?? "Something went wrong");
+      setError(e.message ?? "Something went wrong. Please try again.");
     } finally {
       setLoading(false);
     }

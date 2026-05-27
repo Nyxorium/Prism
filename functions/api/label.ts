@@ -23,6 +23,10 @@ const corsHeaders = (origin: string) => ({
   "Access-Control-Allow-Headers": "Content-Type",
 });
 
+function errorResponse(origin: string, message: string, status: number) {
+  return Response.json({ error: message }, { status, headers: corsHeaders(origin) });
+}
+
 export const onRequestOptions: PagesFunction<Env> = async ({ request }) => {
   const origin = request.headers.get("Origin") ?? "";
   return new Response(null, { status: 204, headers: corsHeaders(origin) });
@@ -35,29 +39,34 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   try {
     body = await request.json();
   } catch {
-    return Response.json({ error: "Invalid JSON" }, { status: 400, headers: corsHeaders(origin) });
+    return errorResponse(origin, "Invalid request body.", 400);
   }
 
   const { handle, appPassword, pdsUrl, label, action } = body;
 
   if (!handle || !appPassword || !label || !action) {
-    return Response.json({ error: "Missing required fields" }, { status: 400, headers: corsHeaders(origin) });
+    return errorResponse(origin, "Missing required fields.", 400);
   }
 
   if (!["add", "remove"].includes(action)) {
-    return Response.json({ error: "Invalid action" }, { status: 400, headers: corsHeaders(origin) });
+    return errorResponse(origin, "Invalid action.", 400);
   }
 
   if (!LABEL_IDS.has(label)) {
-    return Response.json({ error: "Label not permitted" }, { status: 400, headers: corsHeaders(origin) });
+    return errorResponse(origin, "That label isn't supported.", 400);
   }
 
   // Verify user identity against their PDS
   const userAgent = new BskyAgent({ service: pdsUrl || DEFAULT_PDS });
   try {
     await userAgent.login({ identifier: handle, password: appPassword });
-  } catch {
-    return Response.json({ error: "Invalid credentials" }, { status: 401, headers: corsHeaders(origin) });
+  } catch (err: any) {
+    const msg = err?.message ?? "";
+    if (msg.includes("fetch") || msg.includes("network") || msg.includes("ECONNREFUSED")) {
+      console.error("PDS unreachable:", pdsUrl, err);
+      return errorResponse(origin, "Couldn't reach your PDS. Check the URL in Advanced settings and try again.", 503);
+    }
+    return errorResponse(origin, "Invalid credentials. If your account isn't on Bluesky, make sure to set your provider under Advanced.", 401);
   }
 
   const verifiedDid = userAgent.session!.did;
@@ -69,8 +78,14 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       identifier: env.LABELLER_HANDLE,
       password: env.LABELLER_APP_PASSWORD,
     });
-  } catch {
-    return Response.json({ error: "Labeller auth failed" }, { status: 500, headers: corsHeaders(origin) });
+  } catch (err: any) {
+    const msg = err?.message ?? "";
+    if (msg.includes("fetch") || msg.includes("network") || msg.includes("ECONNREFUSED")) {
+      console.error("Labeller PDS unreachable:", err);
+      return errorResponse(origin, "The labeller service is currently unreachable. Please try again later.", 503);
+    }
+    console.error("Labeller auth failed:", err);
+    return errorResponse(origin, "The labeller service is misconfigured. Please contact the administrator.", 500);
   }
 
   // Apply or remove the label
@@ -91,9 +106,14 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
         createdAt: new Date().toISOString(),
         subjectBlobCids: [],
       });
-  } catch (err) {
+  } catch (err: any) {
+    const msg = err?.message ?? "";
+    if (msg.includes("fetch") || msg.includes("network") || msg.includes("ECONNREFUSED")) {
+      console.error("Ozone unreachable:", err);
+      return errorResponse(origin, "The labeller service is currently unreachable. Please try again later.", 503);
+    }
     console.error("emitEvent failed:", err);
-    return Response.json({ error: "Failed to apply label" }, { status: 500, headers: corsHeaders(origin) });
+    return errorResponse(origin, "The labeller service returned an error. Please try again later.", 500);
   }
 
   return Response.json(

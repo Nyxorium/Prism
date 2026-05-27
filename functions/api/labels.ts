@@ -19,6 +19,10 @@ const corsHeaders = (origin: string) => ({
   "Access-Control-Allow-Headers": "Content-Type",
 });
 
+function errorResponse(origin: string, message: string, status: number) {
+  return Response.json({ error: message }, { status, headers: corsHeaders(origin) });
+}
+
 export const onRequestOptions: PagesFunction<Env> = async ({ request }) => {
   const origin = request.headers.get("Origin") ?? "";
   return new Response(null, { status: 204, headers: corsHeaders(origin) });
@@ -31,21 +35,26 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   try {
     body = await request.json();
   } catch {
-    return Response.json({ error: "Invalid JSON" }, { status: 400, headers: corsHeaders(origin) });
+    return errorResponse(origin, "Invalid request body.", 400);
   }
 
   const { handle, appPassword, pdsUrl } = body;
 
   if (!handle || !appPassword) {
-    return Response.json({ error: "Missing required fields" }, { status: 400, headers: corsHeaders(origin) });
+    return errorResponse(origin, "Missing required fields.", 400);
   }
 
   // Verify user identity against their PDS
   const userAgent = new BskyAgent({ service: pdsUrl || DEFAULT_PDS });
   try {
     await userAgent.login({ identifier: handle, password: appPassword });
-  } catch {
-    return Response.json({ error: "Invalid credentials" }, { status: 401, headers: corsHeaders(origin) });
+  } catch (err: any) {
+    const msg = err?.message ?? "";
+    if (msg.includes("fetch") || msg.includes("network") || msg.includes("ECONNREFUSED")) {
+      console.error("PDS unreachable:", pdsUrl, err);
+      return errorResponse(origin, "Couldn't reach your PDS. Check the URL in Advanced settings and try again.", 503);
+    }
+    return errorResponse(origin, "Invalid credentials. If your account isn't on Bluesky, make sure to set your provider under Advanced.", 401);
   }
 
   const did = userAgent.session!.did;
@@ -55,12 +64,18 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     const serviceUrl = env.LABELLER_SERVICE_URL.replace(/\/$/, "");
     const url = `${serviceUrl}/xrpc/com.atproto.label.queryLabels?uriPatterns=${encodeURIComponent(did)}&sources=${encodeURIComponent(env.LABELLER_DID)}`;
 
-    const res = await fetch(url, { headers: { Accept: "application/json" } });
+    let res: Response;
+    try {
+      res = await fetch(url, { headers: { Accept: "application/json" } });
+    } catch (err: any) {
+      console.error("Ozone unreachable:", err);
+      return errorResponse(origin, "The labeller service is currently unreachable. Please try again later.", 503);
+    }
 
     if (!res.ok) {
       const text = await res.text();
       console.error(`queryLabels HTTP ${res.status}:`, text);
-      throw new Error(`Label query returned ${res.status}`);
+      return errorResponse(origin, "The labeller service returned an error. Please try again later.", 500);
     }
 
     const data: any = await res.json();
@@ -76,7 +91,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
 
     return Response.json({ did, labels: activeLabels }, { status: 200, headers: corsHeaders(origin) });
   } catch (err) {
-    console.error("queryLabels failed:", err);
-    return Response.json({ error: "Failed to fetch labels" }, { status: 500, headers: corsHeaders(origin) });
+    console.error("queryLabels failed unexpectedly:", err);
+    return errorResponse(origin, "Something went wrong fetching your labels. Please try again.", 500);
   }
 };
