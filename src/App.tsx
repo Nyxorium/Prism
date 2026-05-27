@@ -180,9 +180,10 @@ export default function App() {
         {step === "labels" && session && (
           <div className="card">
             <h1 className="card-title">Choose your labels</h1>
-            <p className="card-subtitle">
-              Signed in as <strong>{session.handle}</strong>
-            </p>
+            <div className="subtitle-row">
+              <span className="text-muted">Signed in as <strong>{session.handle}</strong></span>
+              <button className="btn-signout" onClick={() => { setSession(null); setStep("login"); setError(null); }}>Sign out</button>
+            </div>
             <div className="label-grid">
               {LABELS.map(({ id, name }) => (
                 <button

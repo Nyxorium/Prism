@@ -249,3 +249,31 @@ a:hover {
   font-size: 12px;
   margin-top: -4px;
 }
+
+.btn-signout {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-family: 'Sora', sans-serif;
+  font-size: 12px;
+  padding: 0;
+  text-decoration: underline;
+  transition: color 0.15s;
+}
+
+.btn-signout:hover {
+  color: var(--error);
+}
+
+.subtitle-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: -12px;
+}
+
+.subtitle-row .text-muted {
+  color: var(--text-muted);
+  font-size: 14px;
+}
