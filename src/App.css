@@ -224,7 +224,16 @@ a:hover {
   .header-inner {
     flex-direction: column;
     align-items: flex-start;
-    gap: 4px;
+    gap: 2px;
+  }
+
+  .subtitle-row {
+    flex-wrap: nowrap;
+  }
+
+  .btn-signout {
+    white-space: nowrap;
+    flex-shrink: 0;
   }
 }
 
@@ -276,4 +285,8 @@ a:hover {
 .subtitle-row .text-muted {
   color: var(--text-muted);
   font-size: 14px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
