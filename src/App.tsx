@@ -24,6 +24,7 @@ export default function App() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
 
   const handleLogin = async () => {
     setError(null);
@@ -182,19 +183,34 @@ export default function App() {
             <h1 className="card-title">Choose your labels</h1>
             <div className="subtitle-row">
               <span className="text-muted">Signed in as <strong>{session.handle}</strong></span>
-              <button className="btn-signout" onClick={() => { setSession(null); setStep("login"); setError(null); }}>Sign out</button>
+              <button className="btn-signout" onClick={() => { setSession(null); setStep("login"); setError(null); setSearch(""); }}>Sign out</button>
             </div>
-            <div className="label-grid">
-              {LABELS.map(({ id, name }) => (
-                <button
-                  key={id}
-                  className={`label-chip ${selected.has(id) ? "label-chip--active" : ""}`}
-                  onClick={() => toggleLabel(id)}
-                >
-                  {name}
-                </button>
-              ))}
-            </div>
+            <input
+              className="input"
+              type="text"
+              placeholder="Search labels…"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
+            {(() => {
+              const q = search.toLowerCase();
+              const filtered = LABELS.filter(l => l.name.toLowerCase().includes(q));
+              return filtered.length > 0
+                ? (
+                  <div className="label-grid">
+                    {filtered.map(({ id, name }) => (
+                      <button
+                        key={id}
+                        className={`label-chip ${selected.has(id) ? "label-chip--active" : ""}`}
+                        onClick={() => toggleLabel(id)}
+                      >
+                        {name}
+                      </button>
+                    ))}
+                  </div>
+                )
+                : <p className="no-changes">No labels found.</p>;
+            })()}
             {error && <p className="error">{error}</p>}
             <button className="btn" onClick={handleSubmit} disabled={loading || !hasChanges}>
               {loading ? "Saving…" : "Save labels"}
