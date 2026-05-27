@@ -213,9 +213,8 @@ export default function App() {
             })()}
             {error && <p className="error">{error}</p>}
             <button className="btn" onClick={handleSubmit} disabled={loading || !hasChanges}>
-              {loading ? "Saving…" : "Save labels"}
+              {loading ? "Saving…" : hasChanges ? "Save labels" : "No changes to save"}
             </button>
-            {!hasChanges && <p className="no-changes">No changes to save.</p>}
           </div>
         )}
 
