@@ -1,16 +1,21 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { LABELS } from "./labels";
+import { oauthClient } from "./oauth";
+import type { OAuthSession } from "@atproto/oauth-client-browser";
 import "./App.css";
 
 const DEFAULT_PDS = "https://bsky.social";
 
 type Step = "login" | "labels" | "success";
+type AuthMethod = "oauth" | "apppassword";
 
 interface Session {
+  method: AuthMethod;
   handle: string;
-  appPassword: string;
-  pdsUrl: string;
   did: string;
+  pdsUrl: string;
+  appPassword?: string;
+  oauthSession?: OAuthSession;
   currentLabels: string[];
 }
 
@@ -20,13 +25,79 @@ export default function App() {
   const [appPassword, setAppPassword] = useState("");
   const [pdsUrl, setPdsUrl] = useState(() => localStorage.getItem('pridelabeller:pdsUrl') ?? DEFAULT_PDS);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showAppPassword, setShowAppPassword] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
+  const [oauthLoading, setOauthLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
 
-  const handleLogin = async () => {
+  useEffect(() => {
+    const init = async () => {
+      try {
+        const result = await oauthClient.init();
+        if (result?.session) {
+          await loadOAuthSession(result.session);
+        }
+      } catch (e) {
+        console.error("OAuth init failed:", e);
+      }
+    };
+    init();
+  }, []);
+
+  const loadOAuthSession = async (oauthSession: OAuthSession) => {
+    setLoading(true);
+    setError(null);
+    try {
+      // sub is already verified by the OAuth flow — no need to re-verify
+      const did = oauthSession.sub;
+      const pds = oauthSession.serverMetadata?.issuer ?? DEFAULT_PDS;
+
+      const res = await fetch("/api/labels", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ verifiedDid: did, pdsUrl: pds }),
+      });
+      const data = await res.json() as Record<string, any>;
+      if (!res.ok) throw new Error(data.error ?? "Something went wrong. Please try again.");
+
+      const savedHandle = localStorage.getItem('pridelabeller:handle') ?? did;
+      setSession({
+        method: "oauth",
+        handle: savedHandle,
+        did,
+        pdsUrl: pds,
+        oauthSession,
+        currentLabels: data.labels,
+      });
+      setSelected(new Set(data.labels));
+      setStep("labels");
+    } catch (e: any) {
+      setError(e.message ?? "Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleOAuthLogin = async () => {
+    if (!handle) {
+      setError("Please enter your handle first.");
+      return;
+    }
+    setError(null);
+    setOauthLoading(true);
+    try {
+      localStorage.setItem('pridelabeller:handle', handle);
+      await oauthClient.signIn(handle);
+    } catch (e: any) {
+      setError(e.message ?? "OAuth sign in failed. Please try again.");
+      setOauthLoading(false);
+    }
+  };
+
+  const handleAppPasswordLogin = async () => {
     setError(null);
     setLoading(true);
     try {
@@ -39,7 +110,14 @@ export default function App() {
       if (!res.ok) throw new Error(data.error ?? "Something went wrong. Please try again.");
       localStorage.setItem('pridelabeller:pdsUrl', pdsUrl || DEFAULT_PDS);
       localStorage.setItem('pridelabeller:handle', handle);
-      setSession({ handle, appPassword, pdsUrl: pdsUrl || DEFAULT_PDS, did: data.did, currentLabels: data.labels });
+      setSession({
+        method: "apppassword",
+        handle,
+        did: data.did,
+        pdsUrl: pdsUrl || DEFAULT_PDS,
+        appPassword,
+        currentLabels: data.labels,
+      });
       setSelected(new Set(data.labels));
       setStep("labels");
     } catch (e: any) {
@@ -63,16 +141,16 @@ export default function App() {
 
     try {
       for (const { label, action } of actions) {
+        let body: Record<string, any> = { label, action };
+        if (session.method === "oauth") {
+          body = { ...body, verifiedDid: session.did, pdsUrl: session.pdsUrl };
+        } else {
+          body = { ...body, handle: session.handle, appPassword: session.appPassword, pdsUrl: session.pdsUrl };
+        }
         const res = await fetch("/api/label", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            handle: session.handle,
-            appPassword: session.appPassword,
-            pdsUrl: session.pdsUrl,
-            label,
-            action,
-          }),
+          body: JSON.stringify(body),
         });
         const data = await res.json() as Record<string, any>;
         if (!res.ok) throw new Error(data.error ?? "Something went wrong. Please try again.");
@@ -84,6 +162,16 @@ export default function App() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSignOut = async () => {
+    if (session?.method === "oauth" && session.oauthSession) {
+      try { await session.oauthSession.signOut(); } catch {}
+    }
+    setSession(null);
+    setStep("login");
+    setError(null);
+    setSearch("");
   };
 
   const toggleLabel = (id: string) => {
@@ -112,66 +200,77 @@ export default function App() {
         {step === "login" && (
           <div className="card">
             <h1 className="card-title">Sign into the Atmosphere</h1>
-            <p className="card-subtitle">
-              Use an{" "}
-              <a href="https://bsky.app/settings/app-passwords" target="_blank" rel="noreferrer">
-                app password
-              </a>{" "}
-              — never your main password.
-            </p>
+
             <div className="form">
-              <label className="label">Handle or email</label>
+              <label className="label">Handle</label>
               <input
                 className="input"
                 type="text"
                 placeholder="you.bsky.social"
                 value={handle}
                 onChange={e => setHandle(e.target.value)}
-                onKeyDown={e => e.key === "Enter" && handleLogin()}
+                onKeyDown={e => e.key === "Enter" && !showAppPassword && handleOAuthLogin()}
               />
-              <label className="label">App password</label>
-              <input
-                className="input"
-                type="password"
-                placeholder="xxxx-xxxx-xxxx-xxxx"
-                value={appPassword}
-                onChange={e => setAppPassword(e.target.value)}
-                onKeyDown={e => e.key === "Enter" && handleLogin()}
-              />
-
-              <button
-                className="btn-advanced"
-                onClick={() => setShowAdvanced(v => !v)}
-                type="button"
-              >
-                {showAdvanced ? "▾" : "▸"} Advanced
-              </button>
-
-              {showAdvanced && (
-                <>
-                  <label className="label">PDS URL</label>
-                  <input
-                    className="input"
-                    type="text"
-                    placeholder="https://bsky.social"
-                    value={pdsUrl}
-                    onChange={e => setPdsUrl(e.target.value)}
-                  />
-                  <p className="advanced-hint">
-                    Only change this if your account is hosted on a custom PDS.
-                  </p>
-                </>
-              )}
-
-              {error && <p className="error">{error}</p>}
               <button
                 className="btn"
-                onClick={handleLogin}
-                disabled={loading || !handle || !appPassword}
+                onClick={handleOAuthLogin}
+                disabled={oauthLoading || loading || !handle}
               >
-                {loading ? "Signing in…" : "Continue"}
+                {oauthLoading ? "Redirecting…" : "Continue"}
               </button>
             </div>
+
+            {!showAppPassword && (
+              <button className="btn-advanced" onClick={() => setShowAppPassword(true)} type="button">
+                ▸ Use app password instead
+              </button>
+            )}
+
+            {showAppPassword && (
+              <div className="form">
+                <p className="advanced-hint">
+                  Use an <a href="https://bsky.app/settings/app-passwords" target="_blank" rel="noreferrer">app password</a> — never your main password.
+                </p>
+                <label className="label">App password</label>
+                <input
+                  className="input"
+                  type="password"
+                  placeholder="xxxx-xxxx-xxxx-xxxx"
+                  value={appPassword}
+                  onChange={e => setAppPassword(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && handleAppPasswordLogin()}
+                />
+                <button
+                  className="btn btn--secondary"
+                  onClick={handleAppPasswordLogin}
+                  disabled={loading || !handle || !appPassword}
+                >
+                  {loading ? "Signing in…" : "Sign in with app password"}
+                </button>
+
+                <button className="btn-advanced" onClick={() => setShowAdvanced(v => !v)} type="button">
+                  {showAdvanced ? "▾" : "▸"} Advanced
+                </button>
+
+                {showAdvanced && (
+                  <>
+                    <label className="label">PDS URL</label>
+                    <input
+                      className="input"
+                      type="text"
+                      placeholder="https://bsky.social"
+                      value={pdsUrl}
+                      onChange={e => setPdsUrl(e.target.value)}
+                    />
+                    <p className="advanced-hint">
+                      Only change this if your account is hosted on a custom PDS.
+                    </p>
+                  </>
+                )}
+              </div>
+            )}
+
+            {error && <p className="error">{error}</p>}
             <p className="disclaimer">
               Your credentials are used only to verify your identity and are never stored.
             </p>
@@ -183,7 +282,7 @@ export default function App() {
             <h1 className="card-title">Choose your labels</h1>
             <div className="subtitle-row">
               <span className="text-muted">Signed in as <strong>{session.handle}</strong></span>
-              <button className="btn-signout" onClick={() => { setSession(null); setStep("login"); setError(null); setSearch(""); }}>Sign out</button>
+              <button className="btn-signout" onClick={handleSignOut}>Sign out</button>
             </div>
             <input
               className="input"

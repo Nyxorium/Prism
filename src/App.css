@@ -290,3 +290,13 @@ a:hover {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.btn--secondary {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+
+.btn--secondary:hover:not(:disabled) {
+  background: var(--border);
+}

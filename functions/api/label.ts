@@ -2,9 +2,13 @@ import { BskyAgent } from "@atproto/api";
 import { LABEL_IDS } from "../../src/labels";
 
 interface LabelRequest {
-  handle: string;
-  appPassword: string;
+  // App password path
+  handle?: string;
+  appPassword?: string;
   pdsUrl?: string;
+  // OAuth path (frontend-verified)
+  verifiedDid?: string;
+  // Common
   label: string;
   action: "add" | "remove";
 }
@@ -42,9 +46,9 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     return errorResponse(origin, "Invalid request body.", 400);
   }
 
-  const { handle, appPassword, pdsUrl, label, action } = body;
+  const { label, action } = body;
 
-  if (!handle || !appPassword || !label || !action) {
+  if (!label || !action) {
     return errorResponse(origin, "Missing required fields.", 400);
   }
 
@@ -56,20 +60,27 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     return errorResponse(origin, "That label isn't supported.", 400);
   }
 
-  // Verify user identity against their PDS
-  const userAgent = new BskyAgent({ service: pdsUrl || DEFAULT_PDS });
-  try {
-    await userAgent.login({ identifier: handle, password: appPassword });
-  } catch (err: any) {
-    const msg = err?.message ?? "";
-    if (msg.includes("fetch") || msg.includes("network") || msg.includes("ECONNREFUSED")) {
-      console.error("PDS unreachable:", pdsUrl, err);
-      return errorResponse(origin, "Couldn't reach your PDS. Check the URL in Advanced settings and try again.", 503);
-    }
-    return errorResponse(origin, "Invalid credentials. If your account isn't on Bluesky, make sure to set your provider under Advanced.", 401);
-  }
+  let verifiedDid: string;
 
-  const verifiedDid = userAgent.session!.did;
+  if (body.verifiedDid) {
+    // OAuth path — frontend verified the session via DPoP fetchHandler
+    verifiedDid = body.verifiedDid;
+  } else if (body.handle && body.appPassword) {
+    // App password path
+    const userAgent = new BskyAgent({ service: body.pdsUrl || DEFAULT_PDS });
+    try {
+      await userAgent.login({ identifier: body.handle, password: body.appPassword });
+    } catch (err: any) {
+      const msg = err?.message ?? "";
+      if (msg.includes("fetch") || msg.includes("network") || msg.includes("ECONNREFUSED")) {
+        return errorResponse(origin, "Couldn't reach your PDS. Check the URL in Advanced settings and try again.", 503);
+      }
+      return errorResponse(origin, "Invalid credentials. If your account isn't on Bluesky, make sure to set your server under Advanced.", 401);
+    }
+    verifiedDid = userAgent.session!.did;
+  } else {
+    return errorResponse(origin, "Missing required fields.", 400);
+  }
 
   // Log in as the labeller
   const labellerAgent = new BskyAgent({ service: "https://bsky.social" });

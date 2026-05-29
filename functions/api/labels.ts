@@ -1,9 +1,12 @@
 import { BskyAgent } from "@atproto/api";
 
 interface LabelsRequest {
-  handle: string;
-  appPassword: string;
+  // App password path
+  handle?: string;
+  appPassword?: string;
   pdsUrl?: string;
+  // OAuth path (frontend-verified)
+  verifiedDid?: string;
 }
 
 interface Env {
@@ -38,26 +41,27 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     return errorResponse(origin, "Invalid request body.", 400);
   }
 
-  const { handle, appPassword, pdsUrl } = body;
+  let did: string;
 
-  if (!handle || !appPassword) {
+  if (body.verifiedDid) {
+    // OAuth path — frontend verified the session via DPoP fetchHandler
+    did = body.verifiedDid;
+  } else if (body.handle && body.appPassword) {
+    // App password path
+    const userAgent = new BskyAgent({ service: body.pdsUrl || DEFAULT_PDS });
+    try {
+      await userAgent.login({ identifier: body.handle, password: body.appPassword });
+    } catch (err: any) {
+      const msg = err?.message ?? "";
+      if (msg.includes("fetch") || msg.includes("network") || msg.includes("ECONNREFUSED")) {
+        return errorResponse(origin, "Couldn't reach your PDS. Check the URL in Advanced settings and try again.", 503);
+      }
+      return errorResponse(origin, "Invalid credentials. If your account isn't on Bluesky, make sure to set your server under Advanced.", 401);
+    }
+    did = userAgent.session!.did;
+  } else {
     return errorResponse(origin, "Missing required fields.", 400);
   }
-
-  // Verify user identity against their PDS
-  const userAgent = new BskyAgent({ service: pdsUrl || DEFAULT_PDS });
-  try {
-    await userAgent.login({ identifier: handle, password: appPassword });
-  } catch (err: any) {
-    const msg = err?.message ?? "";
-    if (msg.includes("fetch") || msg.includes("network") || msg.includes("ECONNREFUSED")) {
-      console.error("PDS unreachable:", pdsUrl, err);
-      return errorResponse(origin, "Couldn't reach your PDS. Check the URL in Advanced settings and try again.", 503);
-    }
-    return errorResponse(origin, "Invalid credentials. If your account isn't on Bluesky, make sure to set your provider under Advanced.", 401);
-  }
-
-  const did = userAgent.session!.did;
 
   // Query the labeller service for active labels on this DID
   try {
