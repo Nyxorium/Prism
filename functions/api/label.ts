@@ -97,6 +97,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
           $type: "tools.ozone.moderation.defs#modEventLabel",
           createLabelVals: action === "add" ? [label] : [],
           negateLabelVals: action === "remove" ? [label] : [],
+          comment: `Modified via Prism`,
         },
         subject: {
           $type: "com.atproto.admin.defs#repoRef",
