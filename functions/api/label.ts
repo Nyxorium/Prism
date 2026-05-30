@@ -1,12 +1,16 @@
 import { BskyAgent } from "@atproto/api";
 import { LABEL_IDS } from "../../src/labels";
 
+interface LabelEntry {
+  label: string;
+  action: "add" | "remove";
+}
+
 interface LabelRequest {
   handle: string;
   appPassword: string;
   pdsUrl?: string;
-  label: string;
-  action: "add" | "remove";
+  labels: LabelEntry[];
 }
 
 interface Env {
@@ -42,18 +46,22 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     return errorResponse(origin, "Invalid request body.", 400);
   }
 
-  const { handle, appPassword, pdsUrl, label, action } = body;
+  const { handle, appPassword, pdsUrl, labels } = body;
 
-  if (!handle || !appPassword || !label || !action) {
+  if (!handle || !appPassword || !labels || !Array.isArray(labels) || labels.length === 0) {
     return errorResponse(origin, "Missing required fields.", 400);
   }
 
-  if (!["add", "remove"].includes(action)) {
-    return errorResponse(origin, "Invalid action.", 400);
-  }
-
-  if (!LABEL_IDS.has(label)) {
-    return errorResponse(origin, "That label isn't supported.", 400);
+  for (const { label, action } of labels) {
+    if (!label || !action) {
+      return errorResponse(origin, "Missing required fields.", 400);
+    }
+    if (!["add", "remove"].includes(action)) {
+      return errorResponse(origin, "Invalid action.", 400);
+    }
+    if (!LABEL_IDS.has(label)) {
+      return errorResponse(origin, "That label isn't supported.", 400);
+    }
   }
 
   // Verify user identity against their PDS
@@ -88,15 +96,18 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     return errorResponse(origin, "The labeller service is misconfigured. Please contact the administrator.", 500);
   }
 
-  // Apply or remove the label
+  // Apply or remove the labels
+  const createLabelVals = labels.filter(l => l.action === "add").map(l => l.label);
+  const negateLabelVals = labels.filter(l => l.action === "remove").map(l => l.label);
+
   try {
     await labellerAgent
       .withProxy("atproto_labeler", env.LABELLER_DID)
       .api.tools.ozone.moderation.emitEvent({
         event: {
           $type: "tools.ozone.moderation.defs#modEventLabel",
-          createLabelVals: action === "add" ? [label] : [],
-          negateLabelVals: action === "remove" ? [label] : [],
+          createLabelVals,
+          negateLabelVals,
           comment: `Modified via Prism`,
         },
         subject: {
@@ -118,7 +129,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   }
 
   return Response.json(
-    { success: true, did: verifiedDid, label, action },
+    { success: true, did: verifiedDid },
     { status: 200, headers: corsHeaders(origin) }
   );
 };

@@ -56,27 +56,24 @@ export default function App() {
 
     const toAdd = [...selected].filter(l => !session.currentLabels.includes(l));
     const toRemove = session.currentLabels.filter(l => !selected.has(l));
-    const actions = [
+    const labels = [
       ...toAdd.map(label => ({ label, action: "add" as const })),
       ...toRemove.map(label => ({ label, action: "remove" as const })),
     ];
 
     try {
-      for (const { label, action } of actions) {
-        const res = await fetch("/api/label", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            handle: session.handle,
-            appPassword: session.appPassword,
-            pdsUrl: session.pdsUrl,
-            label,
-            action,
-          }),
-        });
-        const data = await res.json() as Record<string, any>;
-        if (!res.ok) throw new Error(data.error ?? "Something went wrong. Please try again.");
-      }
+      const res = await fetch("/api/label", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          handle: session.handle,
+          appPassword: session.appPassword,
+          pdsUrl: session.pdsUrl,
+          labels,
+        }),
+      });
+      const data = await res.json() as Record<string, any>;
+      if (!res.ok) throw new Error(data.error ?? "Something went wrong. Please try again.");
       setSession(s => s ? { ...s, currentLabels: [...selected] } : s);
       setStep("success");
     } catch (e: any) {
