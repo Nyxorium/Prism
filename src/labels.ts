@@ -5,6 +5,7 @@ export interface Label {
 
 export const LABELS: Label[] = [
   { id: "abigender",              name: "Abigender" },
+  { id: "abroflux",               name: "Abroflux" },
   { id: "achillean",              name: "Achillean" },
   { id: "aceflux",                name: "Aceflux" },
   { id: "aegosexual",             name: "Aegosexual" },
@@ -15,6 +16,7 @@ export const LABELS: Label[] = [
   { id: "apagender",              name: "Apagender" },
   { id: "apothiromantic",         name: "Apothiromantic" },
   { id: "apothisexual",           name: "Apothisexual" },
+  { id: "aroaceflux",             name: "Aroaceflux" },
   { id: "aroallo",                name: "Aroallo" },
   { id: "aroflux",                name: "Aroflux" },
   { id: "aromantic",              name: "Aromantic" },
@@ -34,6 +36,7 @@ export const LABELS: Label[] = [
   { id: "cupioromantic",          name: "Cupioromantic" },
   { id: "demiboy",                name: "Demiboy" },
   { id: "demifluid",              name: "Demifluid" },
+  { id: "demifluix",              name: "Demifluix" },
   { id: "demiflux",               name: "Demiflux" },
   { id: "demigender",             name: "Demigender" },
   { id: "demigirl",               name: "Demigirl" },
