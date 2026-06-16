@@ -7,8 +7,9 @@ interface LabelEntry {
 }
 
 interface LabelRequest {
-  handle: string;
-  appPassword: string;
+  // JWT-based
+  accessJwt?: string;
+  did?: string;
   pdsUrl?: string;
   labels: LabelEntry[];
 }
@@ -46,9 +47,10 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     return errorResponse(origin, "Invalid request body.", 400);
   }
 
-  const { handle, appPassword, pdsUrl, labels } = body;
+  const { labels } = body;
+  const resolvedPds = body.pdsUrl || DEFAULT_PDS;
 
-  if (!handle || !appPassword || !labels || !Array.isArray(labels) || labels.length === 0) {
+  if (!labels || !Array.isArray(labels) || labels.length === 0) {
     return errorResponse(origin, "Missing required fields.", 400);
   }
 
@@ -64,20 +66,28 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     }
   }
 
-  // Verify user identity against their PDS
-  const userAgent = new BskyAgent({ service: pdsUrl || DEFAULT_PDS });
-  try {
-    await userAgent.login({ identifier: handle, password: appPassword });
-  } catch (err: any) {
-    const msg = err?.message ?? "";
-    if (msg.includes("fetch") || msg.includes("network") || msg.includes("ECONNREFUSED")) {
-      console.error("PDS unreachable:", pdsUrl, err);
-      return errorResponse(origin, "Couldn't reach your PDS. Check the URL in Advanced settings and try again.", 503);
-    }
-    return errorResponse(origin, "Invalid credentials. If your account isn't on Bluesky, make sure to set your provider under Advanced.", 401);
-  }
+  let verifiedDid: string;
 
-  const verifiedDid = userAgent.session!.did;
+  if (body.accessJwt && body.did) {
+    // JWT path: verify the session against the PDS
+    try {
+      const verifyRes = await fetch(`${resolvedPds}/xrpc/com.atproto.server.getSession`, {
+        headers: { Authorization: `Bearer ${body.accessJwt}` },
+      });
+      if (!verifyRes.ok) {
+        return errorResponse(origin, "Session expired. Please sign in again.", 401);
+      }
+      const verifyData = await verifyRes.json() as Record<string, any>;
+      if (verifyData.did !== body.did) {
+        return errorResponse(origin, "Session mismatch. Please sign in again.", 401);
+      }
+      verifiedDid = verifyData.did;
+    } catch {
+      return errorResponse(origin, "Couldn't verify your session. Please sign in again.", 401);
+    }
+  } else {
+    return errorResponse(origin, "Missing required fields.", 400);
+  }
 
   // Log in as the labeller
   const labellerAgent = new BskyAgent({ service: "https://bsky.social" });

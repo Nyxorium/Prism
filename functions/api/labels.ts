@@ -1,9 +1,13 @@
 import { BskyAgent } from "@atproto/api";
 
 interface LabelsRequest {
-  handle: string;
-  appPassword: string;
+  // JWT-based (returning session)
+  accessJwt?: string;
+  did?: string;
   pdsUrl?: string;
+  // Password-based (first login)
+  handle?: string;
+  appPassword?: string;
 }
 
 interface Env {
@@ -38,26 +42,50 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     return errorResponse(origin, "Invalid request body.", 400);
   }
 
-  const { handle, appPassword, pdsUrl } = body;
+  const resolvedPds = body.pdsUrl || DEFAULT_PDS;
+  let did: string;
+  let accessJwt: string | undefined;
+  let refreshJwt: string | undefined;
 
-  if (!handle || !appPassword) {
+  if (body.accessJwt && body.did) {
+    // JWT path: session restore, verify the token is still good by calling getSession
+    did = body.did;
+    accessJwt = body.accessJwt;
+
+    try {
+      const verifyRes = await fetch(`${resolvedPds}/xrpc/com.atproto.server.getSession`, {
+        headers: { Authorization: `Bearer ${accessJwt}` },
+      });
+      if (!verifyRes.ok) {
+        return errorResponse(origin, "Session expired. Please sign in again.", 401);
+      }
+      const verifyData = await verifyRes.json() as Record<string, any>;
+      // Ensure the DID in the token matches what was sent
+      if (verifyData.did !== did) {
+        return errorResponse(origin, "Session mismatch. Please sign in again.", 401);
+      }
+    } catch {
+      return errorResponse(origin, "Couldn't verify your session. Please sign in again.", 401);
+    }
+  } else if (body.handle && body.appPassword) {
+    // Password path: first login, create a new session and return JWTs
+    const userAgent = new BskyAgent({ service: resolvedPds });
+    try {
+      await userAgent.login({ identifier: body.handle, password: body.appPassword });
+    } catch (err: any) {
+      const msg = err?.message ?? "";
+      if (msg.includes("fetch") || msg.includes("network") || msg.includes("ECONNREFUSED")) {
+        console.error("PDS unreachable:", resolvedPds, err);
+        return errorResponse(origin, "Couldn't reach your PDS. Check the URL in Advanced settings and try again.", 503);
+      }
+      return errorResponse(origin, "Invalid credentials. If your account isn't on Bluesky, make sure to set your provider under Advanced.", 401);
+    }
+    did = userAgent.session!.did;
+    accessJwt = userAgent.session!.accessJwt;
+    refreshJwt = userAgent.session!.refreshJwt;
+  } else {
     return errorResponse(origin, "Missing required fields.", 400);
   }
-
-  // Verify user identity against their PDS
-  const userAgent = new BskyAgent({ service: pdsUrl || DEFAULT_PDS });
-  try {
-    await userAgent.login({ identifier: handle, password: appPassword });
-  } catch (err: any) {
-    const msg = err?.message ?? "";
-    if (msg.includes("fetch") || msg.includes("network") || msg.includes("ECONNREFUSED")) {
-      console.error("PDS unreachable:", pdsUrl, err);
-      return errorResponse(origin, "Couldn't reach your PDS. Check the URL in Advanced settings and try again.", 503);
-    }
-    return errorResponse(origin, "Invalid credentials. If your account isn't on Bluesky, make sure to set your provider under Advanced.", 401);
-  }
-
-  const did = userAgent.session!.did;
 
   // Query the labeller service for active labels on this DID
   try {
@@ -89,7 +117,10 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       .filter(([, active]) => active)
       .map(([val]) => val);
 
-    return Response.json({ did, labels: activeLabels }, { status: 200, headers: corsHeaders(origin) });
+    return Response.json(
+      { did, labels: activeLabels, ...(refreshJwt ? { accessJwt, refreshJwt } : {}) },
+      { status: 200, headers: corsHeaders(origin) }
+    );
   } catch (err) {
     console.error("queryLabels failed unexpectedly:", err);
     return errorResponse(origin, "Something went wrong fetching your labels. Please try again.", 500);

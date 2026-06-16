@@ -1,30 +1,96 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { LABELS } from "./labels";
 import "./App.css";
 
 const DEFAULT_PDS = "https://bsky.social";
+const SESSION_KEY = "pridelabeller:session";
 
-type Step = "login" | "labels" | "success";
+type Step = "login" | "restoring" | "labels" | "success";
 
 interface Session {
   handle: string;
-  appPassword: string;
   pdsUrl: string;
   did: string;
+  accessJwt: string;
+  refreshJwt: string;
   currentLabels: string[];
 }
 
+interface StoredSession {
+  handle: string;
+  pdsUrl: string;
+  did: string;
+  accessJwt: string;
+  refreshJwt: string;
+}
+
+async function refreshStoredSession(stored: StoredSession): Promise<StoredSession | null> {
+  try {
+    const res = await fetch(`${stored.pdsUrl}/xrpc/com.atproto.server.refreshSession`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${stored.refreshJwt}` },
+    });
+    if (!res.ok) throw new Error("refresh failed");
+    const data = await res.json() as Record<string, any>;
+    const refreshed: StoredSession = {
+      ...stored,
+      accessJwt: data.accessJwt,
+      refreshJwt: data.refreshJwt,
+    };
+    localStorage.setItem(SESSION_KEY, JSON.stringify(refreshed));
+    return refreshed;
+  } catch {
+    localStorage.removeItem(SESSION_KEY);
+    return null;
+  }
+}
+
 export default function App() {
-  const [step, setStep] = useState<Step>("login");
-  const [handle, setHandle] = useState(() => localStorage.getItem('pridelabeller:handle') ?? '');
+  const [step, setStep] = useState<Step>("restoring");
+  const [handle, setHandle] = useState(() => localStorage.getItem("pridelabeller:handle") ?? "");
   const [appPassword, setAppPassword] = useState("");
-  const [pdsUrl, setPdsUrl] = useState(() => localStorage.getItem('pridelabeller:pdsUrl') ?? DEFAULT_PDS);
+  const [pdsUrl, setPdsUrl] = useState(() => localStorage.getItem("pridelabeller:pdsUrl") ?? DEFAULT_PDS);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    const stored = localStorage.getItem(SESSION_KEY);
+    if (!stored) {
+      setStep("login");
+      return;
+    }
+
+    const parsed: StoredSession = JSON.parse(stored);
+
+    refreshStoredSession(parsed).then(refreshed => {
+      if (!refreshed) {
+        setStep("login");
+        return;
+      }
+
+      // Fetch current labels using the refreshed session
+      fetch("/api/labels", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accessJwt: refreshed.accessJwt, did: refreshed.did, pdsUrl: refreshed.pdsUrl }),
+      })
+        .then(r => r.json() as Promise<Record<string, any>>)
+        .then((data) => {
+          if (data.error) throw new Error(data.error);
+          setSession({ ...refreshed, currentLabels: data.labels });
+          setSelected(new Set(data.labels));
+          setStep("labels");
+        })
+        .catch(() => {
+          localStorage.removeItem(SESSION_KEY);
+          setStep("login");
+        });
+    });
+  }, []);
 
   const handleLogin = async () => {
     setError(null);
@@ -37,9 +103,19 @@ export default function App() {
       });
       const data = await res.json() as Record<string, any>;
       if (!res.ok) throw new Error(data.error ?? "Something went wrong. Please try again.");
-      localStorage.setItem('pridelabeller:pdsUrl', pdsUrl || DEFAULT_PDS);
-      localStorage.setItem('pridelabeller:handle', handle);
-      setSession({ handle, appPassword, pdsUrl: pdsUrl || DEFAULT_PDS, did: data.did, currentLabels: data.labels });
+
+      const stored: StoredSession = {
+        handle,
+        pdsUrl: pdsUrl || DEFAULT_PDS,
+        did: data.did,
+        accessJwt: data.accessJwt,
+        refreshJwt: data.refreshJwt,
+      };
+      localStorage.setItem(SESSION_KEY, JSON.stringify(stored));
+      localStorage.setItem("pridelabeller:pdsUrl", pdsUrl || DEFAULT_PDS);
+      localStorage.setItem("pridelabeller:handle", handle);
+
+      setSession({ ...stored, currentLabels: data.labels });
       setSelected(new Set(data.labels));
       setStep("labels");
     } catch (e: any) {
@@ -66,8 +142,8 @@ export default function App() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          handle: session.handle,
-          appPassword: session.appPassword,
+          accessJwt: session.accessJwt,
+          did: session.did,
           pdsUrl: session.pdsUrl,
           labels,
         }),
@@ -81,6 +157,15 @@ export default function App() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSignOut = () => {
+    localStorage.removeItem(SESSION_KEY);
+    setSession(null);
+    setStep("login");
+    setError(null);
+    setSearch("");
+    setAppPassword("");
   };
 
   const toggleLabel = (id: string) => {
@@ -106,6 +191,12 @@ export default function App() {
       </header>
 
       <main className="main">
+        {step === "restoring" && (
+          <div className="card">
+            <p className="card-subtitle">Signing you back in…</p>
+          </div>
+        )}
+
         {step === "login" && (
           <div className="card">
             <h1 className="card-title">Sign into the Atmosphere</h1>
@@ -170,7 +261,7 @@ export default function App() {
               </button>
             </div>
             <p className="disclaimer">
-              Your credentials are used only to verify your identity and are never stored.
+              Your credentials are used only to verify your identity and are never stored outside of your device.
             </p>
           </div>
         )}
@@ -180,7 +271,7 @@ export default function App() {
             <h1 className="card-title">Choose your labels</h1>
             <div className="subtitle-row">
               <span className="text-muted">Signed in as <strong>{session.handle}</strong></span>
-              <button className="btn-signout" onClick={() => { setSession(null); setStep("login"); setError(null); setSearch(""); }}>Sign out</button>
+              <button className="btn-signout" onClick={handleSignOut}>Sign out</button>
             </div>
             <input
               className="input"
