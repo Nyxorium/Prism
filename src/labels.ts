@@ -66,6 +66,7 @@ export const LABELS: Label[] = [
   { id: "non-binary",             name: "Non-Binary" },
   { id: "omnisexual",             name: "Omnisexual" },
   { id: "oriented-aroace",        name: "Oriented Aroace" },
+  { id: "outherine",              name: "Outherine" },
   { id: "pangender",              name: "Pangender" },
   { id: "panromantic",            name: "Panromantic" },
   { id: "pansexual",              name: "Pansexual" },
