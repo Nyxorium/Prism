@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { LABELS } from "./labels";
+import { resolveToPds, ResolveError } from "./lib/atproto-resolve";
 import "./App.css";
 
 const DEFAULT_PDS = "https://bsky.social";
@@ -45,17 +46,33 @@ async function refreshStoredSession(stored: StoredSession): Promise<StoredSessio
   }
 }
 
+// pridelabeller:pdsUrl is only valid if pridelabeller:handle still matches.
+function getCachedPds(handle: string): string {
+  if (!handle) return "";
+  if (localStorage.getItem("pridelabeller:handle") !== handle) return "";
+  return localStorage.getItem("pridelabeller:pdsUrl") ?? "";
+}
+
 export default function App() {
   const [step, setStep] = useState<Step>("restoring");
   const [handle, setHandle] = useState(() => localStorage.getItem("pridelabeller:handle") ?? "");
   const [appPassword, setAppPassword] = useState("");
-  const [pdsUrl, setPdsUrl] = useState(() => localStorage.getItem("pridelabeller:pdsUrl") ?? DEFAULT_PDS);
+  const [pdsUrl, setPdsUrl] = useState(() => getCachedPds(handle));
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  // True if pdsUrl came from auto-detection
+  // Only auto-detected values get overwritten by later runs.
+  const pdsAutoFilled = useRef(true);
+  // Handle we've already resolved a PDS for; lets detectPds skip repeats.
+  const lastResolvedHandle = useRef(getCachedPds(handle) ? handle : "");
+  // Bumped per attempt so a stale result can never overwrite a newer one.
+  const resolveRequestId = useRef(0);
+  const [pdsDetecting, setPdsDetecting] = useState(false);
+  const [pdsDetectError, setPdsDetectError] = useState<string | null>(null);
 
   useEffect(() => {
     const stored = localStorage.getItem(SESSION_KEY);
@@ -92,28 +109,70 @@ export default function App() {
     });
   }, []);
 
+  // Resolves the PDS for a handle, Skips if already resolved/cached.
+  const detectPds = async (targetHandle: string) => {
+    if (!targetHandle || !pdsAutoFilled.current) return;
+    if (targetHandle === lastResolvedHandle.current) return;
+
+    // Claim an id so a slower, earlier attempt can't mess with a newer one.
+    const requestId = ++resolveRequestId.current;
+
+    setPdsDetecting(true);
+    setPdsDetectError(null);
+    try {
+      const resolved = await resolveToPds(targetHandle);
+      if (resolveRequestId.current !== requestId || !pdsAutoFilled.current) return;
+      setPdsUrl(resolved);
+      lastResolvedHandle.current = targetHandle;
+    } catch (err) {
+      if (resolveRequestId.current !== requestId || !pdsAutoFilled.current) return;
+      setPdsUrl("");
+      setPdsDetectError(err instanceof ResolveError ? err.message : "Couldn't auto-detect your provider.");
+    } finally {
+      if (resolveRequestId.current === requestId) setPdsDetecting(false);
+    }
+  };
+
   const handleLogin = async () => {
     setError(null);
     setLoading(true);
     try {
+      let effectivePds = pdsUrl;
+      // If detection hasn't run yet (e.g. Continue before blur fired), resolve
+      // synchronously rather than falling back to an incorrect PDS.
+      if (!effectivePds && pdsAutoFilled.current) {
+        resolveRequestId.current++; // invalidate any pending detectPds attempt
+        try {
+          effectivePds = await resolveToPds(handle);
+          setPdsUrl(effectivePds);
+          lastResolvedHandle.current = handle;
+        } catch (err) {
+          throw new Error(
+            err instanceof ResolveError
+              ? err.message
+              : "Couldn't auto-detect your provider. Try setting it manually under Advanced."
+          );
+        }
+      }
+
       const res = await fetch("/api/labels", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ handle, appPassword, pdsUrl: pdsUrl || DEFAULT_PDS }),
+        body: JSON.stringify({ handle, appPassword, pdsUrl: effectivePds || DEFAULT_PDS }),
       });
       const data = await res.json() as Record<string, any>;
       if (!res.ok) throw new Error(data.error ?? "Something went wrong. Please try again.");
 
       const stored: StoredSession = {
         handle,
-        pdsUrl: pdsUrl || DEFAULT_PDS,
+        pdsUrl: effectivePds || DEFAULT_PDS,
         did: data.did,
         accessJwt: data.accessJwt,
         refreshJwt: data.refreshJwt,
       };
       localStorage.setItem(SESSION_KEY, JSON.stringify(stored));
-      localStorage.setItem("pridelabeller:pdsUrl", pdsUrl || DEFAULT_PDS);
       localStorage.setItem("pridelabeller:handle", handle);
+      localStorage.setItem("pridelabeller:pdsUrl", effectivePds || DEFAULT_PDS);
 
       setSession({ ...stored, currentLabels: data.labels });
       setSelected(new Set(data.labels));
@@ -215,6 +274,7 @@ export default function App() {
                 placeholder="you.bsky.social"
                 value={handle}
                 onChange={e => setHandle(e.target.value)}
+                onBlur={e => detectPds(e.target.value)}
                 onKeyDown={e => e.key === "Enter" && handleLogin()}
               />
               <label className="label">App password</label>
@@ -237,16 +297,37 @@ export default function App() {
 
               {showAdvanced && (
                 <>
-                  <label className="label">PDS URL</label>
-                  <input
-                    className="input"
-                    type="text"
-                    placeholder="https://bsky.social"
-                    value={pdsUrl}
-                    onChange={e => setPdsUrl(e.target.value)}
-                  />
+                  <label className="label">Hosting Provider</label>
+                  <div className="pds-row">
+                    <input
+                      className="input"
+                      type="text"
+                      placeholder={pdsDetecting ? "Detecting…" : "Auto-detected from your handle"}
+                      value={pdsUrl}
+                      onChange={e => {
+                        pdsAutoFilled.current = false;
+                        setPdsDetectError(null);
+                        setPdsUrl(e.target.value);
+                      }}
+                    />
+                    <button
+                      type="button"
+                      className="btn-retry"
+                      title="Re-detect from handle"
+                      disabled={pdsDetecting || !handle}
+                      onClick={() => {
+                        pdsAutoFilled.current = true;
+                        lastResolvedHandle.current = "";
+                        detectPds(handle);
+                      }}
+                    >
+                      ↻
+                    </button>
+                  </div>
                   <p className="advanced-hint">
-                    Only change this if your account is hosted on a custom PDS.
+                    {pdsDetectError
+                      ? `${pdsDetectError} Enter your provider's URL manually above.`
+                      : "We'll fill this in automatically! Override if something goes wrong."}
                   </p>
                 </>
               )}

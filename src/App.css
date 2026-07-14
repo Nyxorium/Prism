@@ -259,6 +259,39 @@ a:hover {
   margin-top: -4px;
 }
 
+.pds-row {
+  display: flex;
+  gap: 8px;
+}
+
+.pds-row .input {
+  flex: 1;
+  min-width: 0;
+}
+
+.btn-retry {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0 12px;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.btn-retry:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.btn-retry:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 .btn-signout {
   background: none;
   border: none;
