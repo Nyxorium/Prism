@@ -44,6 +44,7 @@ export const LABELS: Label[] = [
   { id: "demirose",               name: "Demirose" },
   { id: "demisexual",             name: "Demisexual" },
   { id: "fluidflux",              name: "Fluidflux" },
+  { id: "foxgender",              name: "Foxgender" },
   { id: "gay",                    name: "Gay" },
   { id: "gender-non-conforming",  name: "Gender Non-Conforming" },
   { id: "genderfae",              name: "Genderfae" },
