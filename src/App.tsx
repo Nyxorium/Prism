@@ -409,8 +409,8 @@ export default function App() {
       <footer className="footer">
         <p>
           PrideLabeller ·{" "}
-          <a href="https://github.com/Nyxorium" target="_blank" rel="noreferrer">
-            Nyxorium
+          <a href="https://github.com/Nyxorium/Prism" target="_blank" rel="noreferrer">
+            Source code
           </a>
         </p>
       </footer>
