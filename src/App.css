@@ -1,18 +1,61 @@
 @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Sora:wght@400;600&display=swap');
 
+/* Indigo theme */
 :root {
+  --bg: #100e1f;
+  --surface: #1b1830;
+  --surface2: #241f3d;
+  --border: #302a4d;
+  --text: #f0f0f4;
+  --text-muted: #8888a0;
+  --accent: #8c7ffb;
+  --accent-dim: #8c7ffb33;
+  --accent-hover: #a89cfd;
+  --accent-text: var(--accent);
+  --on-accent: #100e1f;
+  --error: #f87171;
+  --radius: 14px;
+  --radius-sm: 8px;
+}
+
+/* Violet theme */
+[data-theme="violet"] {
   --bg: #0f0f13;
   --surface: #18181f;
   --surface2: #22222c;
   --border: #2e2e3a;
-  --text: #f0f0f4;
-  --text-muted: #8888a0;
   --accent: #c084fc;
   --accent-dim: #7c3aed33;
   --accent-hover: #d8b4fe;
-  --error: #f87171;
-  --radius: 14px;
-  --radius-sm: 8px;
+  --on-accent: #0f0f13;
+}
+
+/* Wine theme */
+[data-theme="wine"] {
+  --bg: #170e12;
+  --surface: #251419;
+  --surface2: #341c22;
+  --border: #3d2129;
+  --accent: #e6a15c;
+  --accent-dim: #e6a15c33;
+  --accent-hover: #edb47c;
+  --on-accent: #170e12;
+}
+
+/* Sky theme */
+[data-theme="sky"] {
+  --bg: #5bcefa;
+  --surface: #ffffff;
+  --surface2: #eaf6fd;
+  --border: #3fb5e6;
+  --text: #262230;
+  --text-muted: #2f3446;
+  --accent: #f5a9b8;
+  --accent-dim: #f5a9b833;
+  --accent-hover: #e8829a;
+  --accent-text: #c85e77;
+  --on-accent: #262230;
+  --error: #c0294a;
 }
 
 *, *::before, *::after {
@@ -28,10 +71,11 @@ body {
   font-size: 15px;
   line-height: 1.6;
   min-height: 100vh;
+  transition: background 0.2s ease;
 }
 
 a {
-  color: var(--accent);
+  color: var(--accent-text);
   text-decoration: none;
 }
 
@@ -55,7 +99,14 @@ a:hover {
   max-width: 640px;
   margin: 0 auto;
   display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.header-row {
+  display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 16px;
 }
 
@@ -70,6 +121,90 @@ a:hover {
   color: var(--text-muted);
   font-size: 13px;
 }
+
+/* Theme switcher */
+.theme-switcher {
+  position: relative;
+}
+
+.theme-trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text);
+  cursor: pointer;
+  font-family: 'Sora', sans-serif;
+  font-size: 13px;
+  padding: 8px 12px;
+  min-height: 36px;
+  transition: border-color 0.15s;
+}
+
+.theme-trigger:hover {
+  border-color: var(--accent);
+}
+
+.theme-trigger svg {
+  color: var(--text-muted);
+  transition: transform 0.15s;
+}
+
+.theme-trigger[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+
+.theme-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.theme-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  list-style: none;
+  min-width: 160px;
+  padding: 6px;
+  z-index: 20;
+}
+
+.theme-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 6px;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 8px 10px;
+  min-height: 36px;
+  transition: background 0.1s, color 0.1s;
+}
+
+.theme-option:hover {
+  background: var(--surface);
+  color: var(--text);
+}
+
+.theme-option--active {
+  background: var(--surface);
+  color: var(--text);
+}
+
+.theme-check {
+  margin-left: auto;
+  color: var(--text);
+  flex-shrink: 0;
+}
+/* Theme switcher end */
 
 .main {
   flex: 1;
@@ -89,6 +224,7 @@ a:hover {
   display: flex;
   flex-direction: column;
   gap: 20px;
+  transition: background 0.2s ease, border-color 0.2s ease;
 }
 
 .card-title {
@@ -114,8 +250,6 @@ a:hover {
   font-size: 13px;
   font-weight: 600;
   color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
 }
 
 .input {
@@ -142,7 +276,7 @@ a:hover {
   background: var(--accent);
   border: none;
   border-radius: var(--radius-sm);
-  color: #0f0f13;
+  color: var(--on-accent);
   cursor: pointer;
   font-family: 'Nunito', sans-serif;
   font-size: 15px;
@@ -188,7 +322,7 @@ a:hover {
 .label-chip--active {
   background: var(--accent-dim);
   border-color: var(--accent);
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .error {
@@ -219,12 +353,6 @@ a:hover {
 @media (max-width: 560px) {
   .card {
     padding: 24px 20px;
-  }
-
-  .header-inner {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 2px;
   }
 
   .subtitle-row {

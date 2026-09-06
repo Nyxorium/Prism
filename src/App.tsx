@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { LABELS } from "./labels";
 import { resolveToPds, ResolveError } from "./lib/atproto-resolve";
 import "./App.css";
+import ThemeSwitcher from "./ThemeSwitcher";
 
 const DEFAULT_PDS = "https://bsky.social";
 const SESSION_KEY = "pridelabeller:session";
@@ -244,7 +245,10 @@ export default function App() {
     <div className="app">
       <header className="header">
         <div className="header-inner">
-          <span className="logo">🏳️‍🌈 PrideLabeller</span>
+          <div className="header-row">
+            <span className="logo">🏳️‍🌈 PrideLabeller</span>
+            <ThemeSwitcher />
+          </div>
           <span className="tagline">Add pride labels to your profile using <a href="https://bsky.app/profile/pridelabeller.bsky.social" target="_blank" rel="noreferrer">pridelabeller.bsky.social</a></span>
         </div>
       </header>
