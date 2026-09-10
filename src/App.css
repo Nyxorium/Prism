@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Sora:wght@400;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Inter:wght@400;600&display=swap');
 
 /* Indigo theme */
 :root {
@@ -67,7 +67,7 @@
 body {
   background: var(--bg);
   color: var(--text);
-  font-family: 'Sora', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 15px;
   line-height: 1.6;
   min-height: 100vh;
@@ -136,7 +136,7 @@ a:hover {
   border-radius: 999px;
   color: var(--text);
   cursor: pointer;
-  font-family: 'Sora', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 13px;
   padding: 8px 12px;
   min-height: 36px;
@@ -257,7 +257,7 @@ a:hover {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--text);
-  font-family: 'Sora', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 14px;
   padding: 10px 14px;
   outline: none;
@@ -307,7 +307,7 @@ a:hover {
   border-radius: 999px;
   color: var(--text-muted);
   cursor: pointer;
-  font-family: 'Sora', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 13px;
   font-weight: 600;
   padding: 7px 16px;
@@ -370,7 +370,7 @@ a:hover {
   border: none;
   color: var(--text-muted);
   cursor: pointer;
-  font-family: 'Sora', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 12px;
   padding: 2px 0;
   text-align: left;
@@ -425,7 +425,7 @@ a:hover {
   border: none;
   color: var(--text-muted);
   cursor: pointer;
-  font-family: 'Sora', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 12px;
   padding: 0;
   text-decoration: underline;
