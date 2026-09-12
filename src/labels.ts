@@ -56,6 +56,7 @@ export const LABELS: Label[] = [
   { id: "girlflux",               name: "Girlflux" },
   { id: "grayromantic",           name: "Grayromantic" },
   { id: "graysexual",             name: "Graysexual" },
+  { id: "greyrose",               name: "Greyrose" },
   { id: "homoromantic",           name: "Homoromantic" },
   { id: "idemromantic",           name: "Idemromantic" },
   { id: "intersex",               name: "Intersex" },
