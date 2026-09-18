@@ -2,31 +2,15 @@
 
 A self-serve web UI for applying pride labels to your Atmosphere/Bluesky profile.
 
-Built by [Nyxorium](https://github.com/Nyxorium).
-
 ## How it works
 
 Users sign in with an app password, pick their pride labels from a curated list, and Prism applies them via an Ozone labeller — no firehose, no persistent process, just a serverless function that fires on demand.
 
-## Project structure
+## Key files
 
-```
-Prism/
-├── functions/
-│   └── api/
-│       ├── label.ts       ← POST /api/label — apply or remove a label
-│       └── labels.ts      ← POST /api/labels — fetch current labels on login
-├── src/
-│   ├── labels.ts          ← ⭐ single source of truth for label definitions
-│   ├── App.tsx
-│   ├── App.css
-│   └── main.tsx
-├── index.html
-├── wrangler.toml
-├── vite.config.ts
-├── tsconfig.json
-└── package.json
-```
+- `src/labels.ts` ← single source of truth for label definitions
+- `functions/api/label.ts` ← `POST /api/label`, applies or removes a label
+- `functions/api/labels.ts` ← `POST /api/labels`, fetches current labels on login
 
 ## Adding or editing labels
 
@@ -39,7 +23,7 @@ export const LABELS: Label[] = [
 ];
 ```
 
-The `id` must match the label identifier in your Ozone labeller service exactly.
+The `id` must match the label identifier in your labeller service file exactly.
 
 ## Cloudflare Pages setup
 
@@ -51,7 +35,7 @@ The `id` must match the label identifier in your Ozone labeller service exactly.
 
 | Name | Description |
 |------|-------------|
-| `LABELLER_DID` | DID of your Ozone labeller account |
+| `LABELLER_DID` | DID of your labeller account |
 | `LABELLER_HANDLE` | Handle of your labeller account |
 | `LABELLER_APP_PASSWORD` | App password for the labeller account |
 | `LABELLER_SERVICE_URL` | URL of your Ozone instance (e.g. `https://ozone.example.com`) |
