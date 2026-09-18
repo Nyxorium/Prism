@@ -19,7 +19,7 @@
 }
 
 /* Violet theme */
-[data-theme="violet"] {
+[data-theme='violet'] {
   --bg: #0f0f13;
   --surface: #18181f;
   --surface2: #22222c;
@@ -31,7 +31,7 @@
 }
 
 /* Wine theme */
-[data-theme="wine"] {
+[data-theme='wine'] {
   --bg: #170e12;
   --surface: #251419;
   --surface2: #341c22;
@@ -43,7 +43,7 @@
 }
 
 /* Sky theme */
-[data-theme="sky"] {
+[data-theme='sky'] {
   --bg: #5bcefa;
   --surface: #ffffff;
   --surface2: #eaf6fd;
@@ -58,7 +58,9 @@
   --error: #c0294a;
 }
 
-*, *::before, *::after {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
@@ -152,7 +154,7 @@ a:hover {
   transition: transform 0.15s;
 }
 
-.theme-trigger[aria-expanded="true"] svg {
+.theme-trigger[aria-expanded='true'] svg {
   transform: rotate(180deg);
 }
 
@@ -186,7 +188,9 @@ a:hover {
   font-size: 13px;
   padding: 8px 10px;
   min-height: 36px;
-  transition: background 0.1s, color 0.1s;
+  transition:
+    background 0.1s,
+    color 0.1s;
 }
 
 .theme-option:hover {
@@ -224,7 +228,9 @@ a:hover {
   display: flex;
   flex-direction: column;
   gap: 20px;
-  transition: background 0.2s ease, border-color 0.2s ease;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease;
 }
 
 .card-title {
@@ -282,7 +288,9 @@ a:hover {
   font-size: 15px;
   font-weight: 700;
   padding: 12px 20px;
-  transition: background 0.15s, opacity 0.15s;
+  transition:
+    background 0.15s,
+    opacity 0.15s;
   margin-top: 4px;
 }
 
@@ -407,7 +415,9 @@ a:hover {
   font-size: 16px;
   line-height: 1;
   padding: 0 12px;
-  transition: color 0.15s, border-color 0.15s;
+  transition:
+    color 0.15s,
+    border-color 0.15s;
 }
 
 .btn-retry:hover:not(:disabled) {

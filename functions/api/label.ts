@@ -1,145 +1,188 @@
-import { BskyAgent } from "@atproto/api";
-import { LABEL_IDS } from "../../src/labels";
+import {BskyAgent} from '@atproto/api'
+import {LABEL_IDS} from '../../src/labels'
 
 interface LabelEntry {
-  label: string;
-  action: "add" | "remove";
+  label: string
+  action: 'add' | 'remove'
 }
 
 interface LabelRequest {
   // JWT-based
-  accessJwt?: string;
-  did?: string;
-  pdsUrl?: string;
-  labels: LabelEntry[];
+  accessJwt?: string
+  did?: string
+  pdsUrl?: string
+  labels: LabelEntry[]
 }
 
 interface Env {
-  LABELLER_DID: string;
-  LABELLER_HANDLE: string;
-  LABELLER_APP_PASSWORD: string;
+  LABELLER_DID: string
+  LABELLER_HANDLE: string
+  LABELLER_APP_PASSWORD: string
 }
 
-const DEFAULT_PDS = "https://bsky.social";
+const DEFAULT_PDS = 'https://bsky.social'
 
 const corsHeaders = (origin: string) => ({
-  "Access-Control-Allow-Origin": origin,
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
-});
+  'Access-Control-Allow-Origin': origin,
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+})
 
 function errorResponse(origin: string, message: string, status: number) {
-  return Response.json({ error: message }, { status, headers: corsHeaders(origin) });
+  return Response.json({error: message}, {status, headers: corsHeaders(origin)})
 }
 
-export const onRequestOptions: PagesFunction<Env> = async ({ request }) => {
-  const origin = request.headers.get("Origin") ?? "";
-  return new Response(null, { status: 204, headers: corsHeaders(origin) });
-};
+export const onRequestOptions: PagesFunction<Env> = async ({request}) => {
+  const origin = request.headers.get('Origin') ?? ''
+  return new Response(null, {status: 204, headers: corsHeaders(origin)})
+}
 
-export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
-  const origin = request.headers.get("Origin") ?? "";
+export const onRequestPost: PagesFunction<Env> = async ({request, env}) => {
+  const origin = request.headers.get('Origin') ?? ''
 
-  let body: LabelRequest;
+  let body: LabelRequest
   try {
-    body = await request.json();
+    body = await request.json()
   } catch {
-    return errorResponse(origin, "Invalid request body.", 400);
+    return errorResponse(origin, 'Invalid request body.', 400)
   }
 
-  const { labels } = body;
-  const resolvedPds = body.pdsUrl || DEFAULT_PDS;
+  const {labels} = body
+  const resolvedPds = body.pdsUrl || DEFAULT_PDS
 
   if (!labels || !Array.isArray(labels) || labels.length === 0) {
-    return errorResponse(origin, "Missing required fields.", 400);
+    return errorResponse(origin, 'Missing required fields.', 400)
   }
 
-  for (const { label, action } of labels) {
+  for (const {label, action} of labels) {
     if (!label || !action) {
-      return errorResponse(origin, "Missing required fields.", 400);
+      return errorResponse(origin, 'Missing required fields.', 400)
     }
-    if (!["add", "remove"].includes(action)) {
-      return errorResponse(origin, "Invalid action.", 400);
+    if (!['add', 'remove'].includes(action)) {
+      return errorResponse(origin, 'Invalid action.', 400)
     }
     if (!LABEL_IDS.has(label)) {
-      return errorResponse(origin, "That label isn't supported.", 400);
+      return errorResponse(origin, "That label isn't supported.", 400)
     }
   }
 
-  let verifiedDid: string;
+  let verifiedDid: string
 
   if (body.accessJwt && body.did) {
     // JWT path: verify the session against the PDS
     try {
-      const verifyRes = await fetch(`${resolvedPds}/xrpc/com.atproto.server.getSession`, {
-        headers: { Authorization: `Bearer ${body.accessJwt}` },
-      });
+      const verifyRes = await fetch(
+        `${resolvedPds}/xrpc/com.atproto.server.getSession`,
+        {
+          headers: {Authorization: `Bearer ${body.accessJwt}`},
+        },
+      )
       if (!verifyRes.ok) {
-        return errorResponse(origin, "Session expired. Please sign in again.", 401);
+        return errorResponse(
+          origin,
+          'Session expired. Please sign in again.',
+          401,
+        )
       }
-      const verifyData = await verifyRes.json() as Record<string, any>;
+      const verifyData = (await verifyRes.json()) as Record<string, any>
       if (verifyData.did !== body.did) {
-        return errorResponse(origin, "Session mismatch. Please sign in again.", 401);
+        return errorResponse(
+          origin,
+          'Session mismatch. Please sign in again.',
+          401,
+        )
       }
-      verifiedDid = verifyData.did;
+      verifiedDid = verifyData.did
     } catch {
-      return errorResponse(origin, "Couldn't verify your session. Please sign in again.", 401);
+      return errorResponse(
+        origin,
+        "Couldn't verify your session. Please sign in again.",
+        401,
+      )
     }
   } else {
-    return errorResponse(origin, "Missing required fields.", 400);
+    return errorResponse(origin, 'Missing required fields.', 400)
   }
 
   // Log in as the labeller
-  const labellerAgent = new BskyAgent({ service: "https://bsky.social" });
+  const labellerAgent = new BskyAgent({service: 'https://bsky.social'})
   try {
     await labellerAgent.login({
       identifier: env.LABELLER_HANDLE,
       password: env.LABELLER_APP_PASSWORD,
-    });
+    })
   } catch (err: any) {
-    const msg = err?.message ?? "";
-    if (msg.includes("fetch") || msg.includes("network") || msg.includes("ECONNREFUSED")) {
-      console.error("Labeller PDS unreachable:", err);
-      return errorResponse(origin, "The labeller service is currently unreachable. Please try again later.", 503);
+    const msg = err?.message ?? ''
+    if (
+      msg.includes('fetch') ||
+      msg.includes('network') ||
+      msg.includes('ECONNREFUSED')
+    ) {
+      console.error('Labeller PDS unreachable:', err)
+      return errorResponse(
+        origin,
+        'The labeller service is currently unreachable. Please try again later.',
+        503,
+      )
     }
-    console.error("Labeller auth failed:", err);
-    return errorResponse(origin, "The labeller service is misconfigured. Please contact the administrator.", 500);
+    console.error('Labeller auth failed:', err)
+    return errorResponse(
+      origin,
+      'The labeller service is misconfigured. Please contact the administrator.',
+      500,
+    )
   }
 
   // Apply or remove the labels
-  const createLabelVals = labels.filter(l => l.action === "add").map(l => l.label);
-  const negateLabelVals = labels.filter(l => l.action === "remove").map(l => l.label);
+  const createLabelVals = labels
+    .filter(l => l.action === 'add')
+    .map(l => l.label)
+  const negateLabelVals = labels
+    .filter(l => l.action === 'remove')
+    .map(l => l.label)
 
   try {
     await labellerAgent
-      .withProxy("atproto_labeler", env.LABELLER_DID)
+      .withProxy('atproto_labeler', env.LABELLER_DID)
       .api.tools.ozone.moderation.emitEvent({
         event: {
-          $type: "tools.ozone.moderation.defs#modEventLabel",
+          $type: 'tools.ozone.moderation.defs#modEventLabel',
           createLabelVals,
           negateLabelVals,
           comment: `Modified via Prism`,
         },
         subject: {
-          $type: "com.atproto.admin.defs#repoRef",
+          $type: 'com.atproto.admin.defs#repoRef',
           did: verifiedDid,
         },
         createdBy: labellerAgent.session!.did,
         createdAt: new Date().toISOString(),
         subjectBlobCids: [],
-      });
+      })
   } catch (err: any) {
-    const msg = err?.message ?? "";
-    if (msg.includes("fetch") || msg.includes("network") || msg.includes("ECONNREFUSED")) {
-      console.error("Ozone unreachable:", err);
-      return errorResponse(origin, "The labeller service is currently unreachable. Please try again later.", 503);
+    const msg = err?.message ?? ''
+    if (
+      msg.includes('fetch') ||
+      msg.includes('network') ||
+      msg.includes('ECONNREFUSED')
+    ) {
+      console.error('Ozone unreachable:', err)
+      return errorResponse(
+        origin,
+        'The labeller service is currently unreachable. Please try again later.',
+        503,
+      )
     }
-    console.error("emitEvent failed:", err);
-    return errorResponse(origin, "The labeller service returned an error. Please try again later.", 500);
+    console.error('emitEvent failed:', err)
+    return errorResponse(
+      origin,
+      'The labeller service returned an error. Please try again later.',
+      500,
+    )
   }
 
   return Response.json(
-    { success: true, did: verifiedDid },
-    { status: 200, headers: corsHeaders(origin) }
-  );
-};
+    {success: true, did: verifiedDid},
+    {status: 200, headers: corsHeaders(origin)},
+  )
+}
