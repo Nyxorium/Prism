@@ -3,6 +3,8 @@ import {LABELS} from './labels'
 import {resolveToPds, ResolveError} from './lib/atproto-resolve'
 import './App.css'
 import ThemeSwitcher from './ThemeSwitcher'
+import {ClientPicker} from './components/ClientPicker'
+import {ClientLink} from './lib/ClientContext'
 
 const DEFAULT_PDS = 'https://bsky.social'
 const SESSION_KEY = 'pridelabeller:session'
@@ -274,12 +276,9 @@ export default function App() {
           </div>
           <span className="tagline">
             Add pride labels to your profile using{' '}
-            <a
-              href="https://bsky.app/profile/pridelabeller.bsky.social"
-              target="_blank"
-              rel="noreferrer">
+            <ClientLink path="/profile/pridelabeller.bsky.social">
               pridelabeller.bsky.social
-            </a>
+            </ClientLink>
           </span>
         </div>
       </header>
@@ -296,12 +295,9 @@ export default function App() {
             <h1 className="card-title">Sign into the Atmosphere</h1>
             <p className="card-subtitle">
               Use an{' '}
-              <a
-                href="https://bsky.app/settings/app-passwords"
-                target="_blank"
-                rel="noreferrer">
+              <ClientLink path='/settings/app-passwords'>
                 app password
-              </a>{' '}
+              </ClientLink>{' '}
               — never your main password.
             </p>
             <div className="form">
@@ -468,6 +464,7 @@ export default function App() {
             Source code
           </a>
         </p>
+        <ClientPicker />
       </footer>
     </div>
   )
