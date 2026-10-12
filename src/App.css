@@ -327,10 +327,16 @@ a:hover {
   color: var(--text);
 }
 
-.label-chip--active {
-  background: var(--accent-dim);
+.label-chip--active,
+.label-chip--active:hover {
+  background: var(--accent);
   border-color: var(--accent);
-  color: var(--accent-text);
+  color: var(--on-accent);
+}
+
+.label-chip--active:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
 }
 
 .error {
